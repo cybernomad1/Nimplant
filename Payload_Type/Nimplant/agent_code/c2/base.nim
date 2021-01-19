@@ -102,7 +102,6 @@ proc main() {.async, rtl.} =
     when defined(useSockets):
         when not defined(release):
             echo "URL: ", $(parseUri(curConfig.Servers[0].Domain) / curConfig.PostUrl)
-
         socket = await newWebSocket($(parseUri(curConfig.Servers[0].Domain) / curConfig.PostUrl))   
     
     while (not await checkin()):
