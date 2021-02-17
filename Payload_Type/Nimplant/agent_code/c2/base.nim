@@ -36,7 +36,7 @@ proc getTasks* : Future[seq[Task]] {.async.} =
     when defined(useSockets):
         let temp = when defined(AESPSK): await Fetch(curConfig, data, true, socket) else: decode(await Fetch(curConfig, data, true, socket))
     else:
-        let temp = when defined(AESPSK): await Fetch(curConfig, data, true, socket) else: decode(await Fetch(curConfig, data, true))    
+        let temp = when defined(AESPSK): await Fetch(curConfig, data, true) else: decode(await Fetch(curConfig, data, true))    
 
     when not defined(release):
         echo "decoded temp: ", temp
@@ -69,7 +69,7 @@ proc checkIn: Future[bool] {.async.} =
         when defined(useSockets):
             let temp = when defined(AESPSK): await Fetch(curConfig, data, true, socket) else: decode(await Fetch(curConfig, data, true, socket))
         else:
-            let temp = when defined(AESPSK): await Fetch(curConfig, data, true, socket) else: decode(await Fetch(curConfig, data, true))
+            let temp = when defined(AESPSK): await Fetch(curConfig, data, true) else: decode(await Fetch(curConfig, data, true))
 
         when not defined(release):
             echo "decoded temp: ", temp
